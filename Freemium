@@ -1,23 +1,32 @@
 --[[
-    LOLZ HUB TROLL — v3.0 💗
-    Fixed: Fly (PlatformStand + Physics state) & Fling (unanchor + max torque)
+    LOLZ HUB TROLL — v4.0 💗
     GUI: Obsidian by deividcomsono
+    Load: uses plain game:HttpGet (same as the working example)
 ]]
 
--- === Library fetch with jsDelivr fallback ===
+-- ============================================================
+--  LIBRARY LOADER — simple, like the working example
+-- ============================================================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local function fetch(url)
-    local ok, res = pcall(game.HttpGet, game, url)
-    if ok and type(res) == "string" and #res > 500 then return res end
-    local mirror = url:gsub("raw%.githubusercontent%.com/deividcomsono/Obsidian/main/",
-        "cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/")
-    local ok2, res2 = pcall(game.HttpGet, game, mirror)
-    if ok2 and type(res2) == "string" and #res2 > 500 then return res2 end
+
+local function loadRemote(url)
+    local ok, res = pcall(function() return game:HttpGet(url) end)
+    if ok and type(res) == "string" and #res > 500 then
+        return res
+    end
+    -- Fallback to syn/request-based executors
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        local ok2, res2 = pcall(req, { Url = url, Method = "GET" })
+        if ok2 and res2 and res2.Body and #res2.Body > 500 then
+            return res2.Body
+        end
+    end
     error("[LOLZ HUB] Failed to download: " .. url)
 end
 
-local Library      = loadstring(fetch(repo .. "Library.lua"))()
-local SaveManager  = loadstring(fetch(repo .. "addons/SaveManager.lua"))()
+local Library     = loadstring(loadRemote(repo .. "Library.lua"))()
+local SaveManager = loadstring(loadRemote(repo .. "addons/SaveManager.lua"))()
 
 local Options = Library.Options
 local Toggles = Library.Toggles
@@ -28,47 +37,48 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer      = Players.LocalPlayer
 
 -- ============================================================
---  💗 FORCED PINK THEME
+--  💗 PINK THEME (wrapped in pcall so a missing key can't crash)
 -- ============================================================
 local function applyPinkTheme()
-    local S = Library.Scheme
-    if not S then return end
-    local PINK       = Color3.fromRGB(255, 105, 180)
-    local PINK_LIGHT = Color3.fromRGB(255, 182, 213)
-    local PINK_DARK  = Color3.fromRGB(180,  60, 130)
-    local BG_DARK    = Color3.fromRGB( 30,  15,  25)
-    local BG_MID     = Color3.fromRGB( 45,  20,  35)
+    pcall(function()
+        local S = Library.Scheme
+        if not S then return end
+        local PINK       = Color3.fromRGB(255, 105, 180)
+        local PINK_LIGHT = Color3.fromRGB(255, 182, 213)
+        local PINK_DARK  = Color3.fromRGB(180,  60, 130)
+        local BG_DARK    = Color3.fromRGB( 30,  15,  25)
+        local BG_MID     = Color3.fromRGB( 45,  20,  35)
 
-    S.Main           = BG_DARK
-    S.Background     = BG_MID
-    S.Outline        = PINK_DARK
-    S.FontColor      = PINK_LIGHT
-    S.Popup          = BG_MID
-    S.Button         = PINK
-    S.ButtonBorder   = PINK_DARK
-    S.Accent         = PINK
-    S.Toggle         = PINK
-    S.ToggleBorder   = PINK_DARK
-    S.Slider         = PINK
-    S.SliderBorder   = PINK_DARK
-    S.Dropdown       = BG_MID
-    S.DropdownBorder = PINK_DARK
-    S.Tab            = BG_DARK
-    S.TabBorder      = PINK_DARK
-    S.Textbox        = BG_DARK
-    S.Placeholder    = Color3.fromRGB(200, 140, 175)
-    S.Red            = Color3.fromRGB(255,  80, 110)
-    S.Green          = Color3.fromRGB(120, 230, 150)
-
-    if Library.UpdateColors  then pcall(Library.UpdateColors)  end
-    if Library.RefreshColors then pcall(Library.RefreshColors) end
+        S.Main           = BG_DARK
+        S.Background     = BG_MID
+        S.Outline        = PINK_DARK
+        S.FontColor      = PINK_LIGHT
+        S.Popup          = BG_MID
+        S.Button         = PINK
+        S.ButtonBorder   = PINK_DARK
+        S.Accent         = PINK
+        S.Toggle         = PINK
+        S.ToggleBorder   = PINK_DARK
+        S.Slider         = PINK
+        S.SliderBorder   = PINK_DARK
+        S.Dropdown       = BG_MID
+        S.DropdownBorder = PINK_DARK
+        S.Tab            = BG_DARK
+        S.TabBorder      = PINK_DARK
+        S.Textbox        = BG_DARK
+        S.Placeholder    = Color3.fromRGB(200, 140, 175)
+        S.Red            = Color3.fromRGB(255,  80, 110)
+        S.Green          = Color3.fromRGB(120, 230, 150)
+    end)
 end
 applyPinkTheme()
 
--- === Window ===
+-- ============================================================
+--  WINDOW
+-- ============================================================
 local Window = Library:CreateWindow({
     Title = "LOLZ HUB TROLL",
-    Footer = "💗 Pink Edition | v1.1",
+    Footer = "💗 Pink Edition | v4.0",
     Icon = 4483345998,
     NotifySide = "Right",
     ShowCustomCursor = true,
@@ -77,16 +87,18 @@ local Window = Library:CreateWindow({
 })
 applyPinkTheme()
 
--- === Tabs ===
+-- ============================================================
+--  TABS
+-- ============================================================
 local Tabs = {
     Local    = Window:AddTab("Local Player", "user"),
     Troll    = Window:AddTab("Troll Others", "zap"),
     Settings = Window:AddTab("UI Settings", "settings"),
 }
 
--- ==========================================================
+-- ============================================================
 --  LOCAL PLAYER TAB
--- ==========================================================
+-- ============================================================
 local MoveGroup = Tabs.Local:AddGroupbox({
     Side = "Left",
     Name = "Movement",
@@ -134,11 +146,9 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- ==========================================================
---  FLY — FIXED
---  Key insight: Humanoid fights BodyMovers. Set PlatformStand
---  + Physics state so the Humanoid stops controlling the rig.
--- ==========================================================
+-- ============================================================
+--  FLY (fixed)
+-- ============================================================
 local flyBV, flyBG, flyConn
 local flyOldState = nil
 
@@ -168,12 +178,10 @@ local function startFly()
 
     stopFly()
 
-    -- Save & override humanoid state so it stops fighting
     flyOldState = hum:GetState()
     pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
     hum.PlatformStand = true
 
-    -- Body movers
     flyBV = Instance.new("BodyVelocity")
     flyBV.Name = "LolzFlyBV"
     flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -189,7 +197,6 @@ local function startFly()
     flyBG.CFrame = hrp.CFrame
     flyBG.Parent = hrp
 
-    -- Use RenderStepped for smoother input sampling
     flyConn = RunService.RenderStepped:Connect(function()
         if not Toggles.FlyToggle or not Toggles.FlyToggle.Value then return end
         local c = LocalPlayer.Character
@@ -201,12 +208,12 @@ local function startFly()
         local cam = workspace.CurrentCamera
         local dir = Vector3.new(0, 0, 0)
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W)        then dir = dir + cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S)        then dir = dir - cam.CFrame.LookVector  end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A)        then dir = dir - cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D)        then dir = dir + cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space)    then dir = dir + Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)then dir = dir - Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W)         then dir = dir + cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S)         then dir = dir - cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A)         then dir = dir - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D)         then dir = dir + cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)     then dir = dir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
 
         if dir.Magnitude > 0 then dir = dir.Unit end
 
@@ -228,7 +235,6 @@ MoveGroup:AddSlider("FlySpeed", {
     Callback = function(v) end,
 })
 
--- Re-fly after respawn
 LocalPlayer.CharacterAdded:Connect(function()
     if Toggles.FlyToggle and Toggles.FlyToggle.Value then
         task.wait(0.8)
@@ -236,9 +242,9 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
--- ==========================================================
+-- ============================================================
 --  SIZE MODS
--- ==========================================================
+-- ============================================================
 local SizeGroup = Tabs.Local:AddGroupbox({
     Side = "Right",
     Name = "Size Mods",
@@ -292,9 +298,9 @@ task.spawn(function()
     end
 end)
 
--- ==========================================================
+-- ============================================================
 --  TROLL OTHERS TAB
--- ==========================================================
+-- ============================================================
 local TargetGroup = Tabs.Troll:AddGroupbox({
     Side = "Left",
     Name = "Target",
@@ -324,24 +330,17 @@ local function getTarget()
     return nil
 end
 
--- ==========================================================
---  FLING — FIXED
---  The trick: kill the Humanoid's state machine so it can't
---  resist. Unanchor + apply max torque spin + burst velocity.
--- ==========================================================
+-- === FLING (fixed) ===
 local function flingCharacter(char)
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
 
-    -- 1. Override the Humanoid state so it can't auto-correct
     pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
     hum.PlatformStand = true
     hum.AutoRotate = false
-    hum.Sit = false
 
-    -- 2. Unanchor every basepart so physics takes full control
     local unanchored = {}
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -350,7 +349,6 @@ local function flingCharacter(char)
         end
     end
 
-    -- 3. Apply insane spin
     local bav = Instance.new("BodyAngularVelocity")
     bav.Name = "LolzFlingSpin"
     bav.AngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
@@ -358,7 +356,6 @@ local function flingCharacter(char)
     bav.P = 1e6
     bav.Parent = hrp
 
-    -- 4. Apply burst velocity in a random direction
     local bv = Instance.new("BodyVelocity")
     bv.Name = "LolzFlingVel"
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -370,19 +367,9 @@ local function flingCharacter(char)
     bv.P = 1e5
     bv.Parent = hrp
 
-    -- 5. Also spam the raw velocity for good measure
-    hrp.AssemblyLinearVelocity = Vector3.new(
-        math.random(-500, 500),
-        math.random(1000, 2000),
-        math.random(-500, 500)
-    )
-    hrp.AssemblyAngularVelocity = Vector3.new(
-        math.random(-100, 100),
-        math.random(-100, 100),
-        math.random(-100, 100)
-    )
+    hrp.AssemblyLinearVelocity  = Vector3.new(math.random(-500, 500), math.random(1000, 2000), math.random(-500, 500))
+    hrp.AssemblyAngularVelocity = Vector3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
 
-    -- 6. Cleanup after 1 second
     task.delay(1, function()
         if bav and bav.Parent then bav:Destroy() end
         if bv  and bv.Parent  then bv:Destroy()  end
@@ -411,7 +398,6 @@ TargetGroup:AddButton({
     Tooltip = "Sends the target flying wildly.",
 })
 
--- === Fling All (continuous) ===
 local flingAllActive = false
 TargetGroup:AddToggle("FlingAll", {
     Text = "🌀 Fling All (Loop)",
@@ -473,9 +459,9 @@ local function setTargetHeadScale(scale)
     mesh.Scale = Vector3.new(scale, scale, scale)
 end
 
-HeadGroup:AddButton({ Text = "🤯 Huge Head Target", Func = function() setTargetHeadScale(5)   end })
-HeadGroup:AddButton({ Text = "🐜 Tiny Head Target",  Func = function() setTargetHeadScale(0.3) end })
-HeadGroup:AddButton({ Text = "↩️ Reset Target Head", Func = function() setTargetHeadScale(1)   end })
+HeadGroup:AddButton({ Text = "🤯 Huge Head Target",  Func = function() setTargetHeadScale(5)   end })
+HeadGroup:AddButton({ Text = "🐜 Tiny Head Target",   Func = function() setTargetHeadScale(0.3) end })
+HeadGroup:AddButton({ Text = "↩️ Reset Target Head",  Func = function() setTargetHeadScale(1)   end })
 
 -- === Chaos ===
 local ChaosGroup = Tabs.Troll:AddGroupbox({
@@ -520,34 +506,42 @@ ChaosGroup:AddButton({
     Tooltip = "Ragdolls and launches the target with fire.",
 })
 
--- ==========================================================
+-- ============================================================
 --  UI SETTINGS TAB
--- ==========================================================
+-- ============================================================
 local MenuGroup = Tabs.Settings:AddGroupbox({
     Side = "Left",
     Name = "Menu",
     IconName = "wrench",
 })
 
-MenuGroup:AddToggle("KeybindMenuOpen", {
-    Default = Library.KeybindFrame.Visible,
-    Text = "Open Keybind Menu",
-    Callback = function(v) Library.KeybindFrame.Visible = v end,
-})
+pcall(function()
+    MenuGroup:AddToggle("KeybindMenuOpen", {
+        Default = Library.KeybindFrame and Library.KeybindFrame.Visible or false,
+        Text = "Open Keybind Menu",
+        Callback = function(v)
+            if Library.KeybindFrame then Library.KeybindFrame.Visible = v end
+        end,
+    })
+end)
+
 MenuGroup:AddToggle("ShowCustomCursor", {
     Text = "Custom Cursor",
-    Default = Library.ShowCustomCursor,
+    Default = Library.ShowCustomCursor or true,
     Callback = function(v) Library.ShowCustomCursor = v end,
 })
+
 MenuGroup:AddToggle("AlwaysOnTop", {
     Text = "Always On Top",
-    Default = Window.AlwaysOnTop,
+    Default = Window.AlwaysOnTop or false,
     Callback = function(v) Window:SetAlwaysOnTop(v) end,
 })
+
 MenuGroup:AddDropdown("NotificationSide", {
     Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
     Callback = function(v) Library:SetNotifySide(v) end,
 })
+
 MenuGroup:AddDropdown("DPIDropdown", {
     Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
     Default = "100%", Text = "DPI Scale",
@@ -556,11 +550,13 @@ MenuGroup:AddDropdown("DPIDropdown", {
         Library:SetDPIScale(tonumber(v))
     end,
 })
+
 MenuGroup:AddSlider("UICornerSlider", {
-    Text = "Corner Radius", Default = Library.CornerRadius,
+    Text = "Corner Radius", Default = Library.CornerRadius or 6,
     Min = 0, Max = 20, Rounding = 0,
     Callback = function(v) Window:SetCornerRadius(v) end,
 })
+
 MenuGroup:AddButton({
     Text = "💗 Re-Apply Pink Theme",
     Func = function()
@@ -568,6 +564,7 @@ MenuGroup:AddButton({
         Library:Notify({ Title = "Theme", Description = "Pink theme re-applied.", Time = 3 })
     end,
 })
+
 MenuGroup:AddDivider()
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
     Default = "RightShift", NoUI = true, Text = "Menu keybind",
@@ -582,16 +579,20 @@ MenuGroup:AddButton({
 
 Library.ToggleKeybind = Options.MenuKeybind
 
--- === SaveManager ===
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-SaveManager:SetFolder("LolzHubTroll/configs")
-SaveManager:BuildConfigSection(Tabs.Settings)
-SaveManager:LoadAutoloadConfig()
+-- ============================================================
+--  SAVE MANAGER (wrapped in pcall — optional)
+-- ============================================================
+pcall(function()
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+    SaveManager:SetFolder("LolzHubTroll/configs")
+    SaveManager:BuildConfigSection(Tabs.Settings)
+    SaveManager:LoadAutoloadConfig()
+end)
 
 Library:Notify({
     Title = "LOLZ HUB TROLL 💗",
-    Description = "v3 — Fly & Fling fixed.",
+    Description = "v4 — loaded successfully.",
     Time = 5,
 })
