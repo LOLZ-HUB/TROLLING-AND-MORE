@@ -61,7 +61,7 @@ MoveGroup:AddSlider("WalkSpeedSlider", {
     Text = "Walk Speed",
     Default = 16,
     Min = 16,
-    Max = 250,
+    Max = 2500,
     Rounding = 0,
     Suffix = " studs",
     Callback = function(Value)
@@ -76,7 +76,7 @@ MoveGroup:AddSlider("JumpPowerSlider", {
     Text = "Jump Power",
     Default = 50,
     Min = 50,
-    Max = 500,
+    Max = 5000,
     Rounding = 0,
     Suffix = " power",
     Callback = function(Value)
