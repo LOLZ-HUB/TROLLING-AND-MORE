@@ -172,7 +172,7 @@ MoveGroup:AddSlider("FlySpeed", {
     Text = "Fly Speed",
     Default = 60,
     Min = 10,
-    Max = 500,
+    Max = 5000,
     Rounding = 0,
     Suffix = " studs/s",
     Callback = function(v) end,
