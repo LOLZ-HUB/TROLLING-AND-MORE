@@ -1,0 +1,447 @@
+--[[
+    LOLZ HUB TROLL
+    UI Library: Obsidian (https://github.com/deividcomsono/Obsidian)
+    Put this in your executor and run it. Have fun (and don't be a jerk in public servers).
+--]]
+
+-- =========================================================
+--  SERVICES
+-- =========================================================
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
+local LocalPlayer       = Players.LocalPlayer
+
+-- =========================================================
+--  LOAD OBSIDIAN UI
+-- =========================================================
+local Obsidian = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Source.lua"))()
+
+local Window = Obsidian:Load({
+    Title = "LOLZ HUB TROLL",
+    Theme = "Light",
+    Color = Color3.fromRGB(255, 105, 180) -- Pink
+})
+
+-- =========================================================
+--  HELPERS
+-- =========================================================
+local function getChar(plr)
+    return plr and plr.Character
+end
+
+local function getHRP(plr)
+    local char = getChar(plr)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum(plr)
+    local char = getChar(plr)
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+-- Steal network ownership of every part in a character (lets us move them)
+local function takeNetwork(character)
+    if not character then return end
+    for _, v in ipairs(character:GetDescendants()) do
+        if v:IsA("BasePart") then
+            pcall(function() v:SetNetworkOwner(LocalPlayer) end)
+        end
+    end
+end
+
+-- Scale the local player's whole body
+local function applyBodyScale(scale)
+    local hum = getHum(LocalPlayer)
+    if not hum then return end
+    for _, name in ipairs({"BodyHeightScale", "BodyWidthScale", "BodyDepthScale", "HeadScale"}) do
+        local num = hum:FindFirstChild(name)
+        if num then num.Value = scale end
+    end
+    hum.HipHeight = 2 * scale
+end
+
+-- Scale just the head
+local function applyHeadScale(scale)
+    local hum = getHum(LocalPlayer)
+    if not hum then return end
+    local hs = hum:FindFirstChild("HeadScale")
+    if hs then hs.Value = scale end
+end
+
+-- =========================================================
+--  TROLL FUNCTIONS
+-- =========================================================
+
+-- FLING: spin + launch the target so physics freaks out
+local function flingPlayer(plr)
+    if not plr or plr == LocalPlayer then return end
+    local char = getChar(plr)
+    local hrp  = getHRP(plr)
+    local hum  = getHum(plr)
+    if not char or not hrp then return end
+
+    if hum then pcall(function() hum.PlatformStand = true end) end
+
+    for _, v in ipairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = false
+            pcall(function() v:SetNetworkOwner(LocalPlayer) end)
+        end
+    end
+
+    local spin = Instance.new("BodyAngularVelocity")
+    spin.AngularVelocity = Vector3.new(0, 99999, 0)
+    spin.MaxTorque       = Vector3.new(math.huge, math.huge, math.huge)
+    spin.P               = 1e6
+    spin.Parent          = hrp
+
+    local push = Instance.new("BodyVelocity")
+    push.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    push.Velocity = Vector3.new(0, 400, 0)
+    push.Parent   = hrp
+
+    task.delay(2, function()
+        pcall(function() spin:Destroy() end)
+        pcall(function() push:Destroy() end)
+    end)
+end
+
+-- UNDERGROUND: teleport the target 500 studs below and turn off collisions
+local function sendUnderground(plr)
+    if not plr then return end
+    local char = getChar(plr)
+    local hrp  = getHRP(plr)
+    if not char or not hrp then return end
+
+    takeNetwork(char)
+    for _, v in ipairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then v.CanCollide = false end
+    end
+
+    local pos = hrp.Position
+    hrp.CFrame = CFrame.new(pos.X, pos.Y - 500, pos.Z)
+end
+
+-- GIANT / BIG HEAD on another player (client-side visual)
+local function setTargetScale(plr, scale, headOnly)
+    local hum = getHum(plr)
+    if not hum then return end
+
+    if headOnly then
+        local hs = hum:FindFirstChild("HeadScale")
+        if hs then hs.Value = scale end
+        return
+    end
+
+    for _, name in ipairs({"BodyHeightScale", "BodyWidthScale", "BodyDepthScale", "HeadScale"}) do
+        local num = hum:FindFirstChild(name)
+        if num then num.Value = scale end
+    end
+    hum.HipHeight = 2 * scale
+end
+
+-- =========================================================
+--  FLY SYSTEM
+-- =========================================================
+local flyState = {
+    Active = false,
+    Speed  = 60,
+    BV     = nil,
+    BG     = nil,
+    Conn   = nil
+}
+
+local function stopFly()
+    if flyState.Conn then flyState.Conn:Disconnect() flyState.Conn = nil end
+    if flyState.BV then flyState.BV:Destroy() flyState.BV = nil end
+    if flyState.BG then flyState.BG:Destroy() flyState.BG = nil end
+
+    local hum = getHum(LocalPlayer)
+    if hum then hum.PlatformStand = false end
+
+    flyState.Active = false
+end
+
+local function startFly()
+    local char = getChar(LocalPlayer)
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    hum.PlatformStand = true
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.zero
+    bv.Parent   = hrp
+
+    local bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P         = 9e4
+    bg.CFrame    = hrp.CFrame
+    bg.Parent    = hrp
+
+    flyState.BV = bv
+    flyState.BG = bg
+    flyState.Active = true
+
+    local cam = workspace.CurrentCamera
+
+    flyState.Conn = RunService.RenderStepped:Connect(function()
+        if not hrp or not hrp.Parent then stopFly() return end
+
+        local dir = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.new(0, 1, 0) end
+
+        if dir.Magnitude > 0 then dir = dir.Unit end
+
+        bv.Velocity = dir * flyState.Speed
+        bg.CFrame   = cam.CFrame
+    end)
+end
+
+-- Stop flying if we respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    if flyState.Active then stopFly() end
+end)
+
+-- =========================================================
+--  TABS
+-- =========================================================
+local LocalTab = Window:MakeTab({
+    Name = "Local Player",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local TrollTab = Window:MakeTab({
+    Name = "Troll",
+    Icon = "rbxassetid://4384403532",
+    PremiumOnly = false
+})
+
+-- =========================================================
+--  LOCAL PLAYER TAB
+-- =========================================================
+LocalTab:AddSection({ Name = "Movement Modifiers" })
+
+LocalTab:AddSlider({
+    Name = "Walk Speed",
+    Min = 16,
+    Max = 300,
+    Default = 16,
+    Color = Color3.fromRGB(255, 105, 180),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value)
+        local hum = getHum(LocalPlayer)
+        if hum then hum.WalkSpeed = Value end
+    end
+})
+
+LocalTab:AddSlider({
+    Name = "Jump Power",
+    Min = 50,
+    Max = 500,
+    Default = 50,
+    Color = Color3.fromRGB(255, 105, 180),
+    Increment = 1,
+    ValueName = "Power",
+    Callback = function(Value)
+        local hum = getHum(LocalPlayer)
+        if hum then hum.JumpPower = Value end
+    end
+})
+
+LocalTab:AddSection({ Name = "Flight" })
+
+LocalTab:AddToggle({
+    Name = "Enable Fly",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startFly()
+        else
+            stopFly()
+        end
+    end
+})
+
+LocalTab:AddSlider({
+    Name = "Fly Speed",
+    Min = 10,
+    Max = 400,
+    Default = 60,
+    Color = Color3.fromRGB(255, 105, 180),
+    Increment = 5,
+    ValueName = "Speed",
+    Callback = function(Value)
+        flyState.Speed = Value
+    end
+})
+
+LocalTab:AddSection({ Name = "Body Scaling" })
+
+LocalTab:AddSlider({
+    Name = "Overall Size",
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Color = Color3.fromRGB(255, 105, 180),
+    Increment = 0.5,
+    ValueName = "Scale",
+    Callback = function(Value)
+        applyBodyScale(Value)
+    end
+})
+
+LocalTab:AddSlider({
+    Name = "Head Size",
+    Min = 1,
+    Max = 20,
+    Default = 1,
+    Color = Color3.fromRGB(255, 105, 180),
+    Increment = 0.5,
+    ValueName = "Scale",
+    Callback = function(Value)
+        applyHeadScale(Value)
+    end
+})
+
+LocalTab:AddButton({
+    Name = "Reset Size",
+    Callback = function()
+        applyBodyScale(1)
+    end
+})
+
+-- =========================================================
+--  TROLL TAB
+-- =========================================================
+TrollTab:AddSection({ Name = "Target" })
+
+local SelectedTarget = "None"
+
+local function playerNames()
+    local list = { "None" }
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(list, plr.Name)
+        end
+    end
+    return list
+end
+
+local PlayerDropdown
+PlayerDropdown = TrollTab:AddDropdown({
+    Name = "Select Player",
+    Options = playerNames(),
+    Default = "None",
+    Callback = function(Value)
+        SelectedTarget = Value
+    end
+})
+
+local function getSelectedPlayer()
+    if not SelectedTarget or SelectedTarget == "None" then return nil end
+    return Players:FindFirstChild(SelectedTarget)
+end
+
+TrollTab:AddButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        local ok = pcall(function() PlayerDropdown:Refresh(playerNames()) end)
+        if not ok then
+            pcall(function() PlayerDropdown:SetOptions(playerNames()) end)
+        end
+    end
+})
+
+TrollTab:AddSection({ Name = "Actions" })
+
+TrollTab:AddButton({
+    Name = "Fling Target",
+    Callback = function()
+        local plr = getSelectedPlayer()
+        if plr then flingPlayer(plr) end
+    end
+})
+
+TrollTab:AddButton({
+    Name = "Fling EVERYONE",
+    Callback = function()
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                flingPlayer(plr)
+            end
+        end
+    end
+})
+
+TrollTab:AddButton({
+    Name = "Send Target Underground",
+    Callback = function()
+        local plr = getSelectedPlayer()
+        if plr then sendUnderground(plr) end
+    end
+})
+
+TrollTab:AddButton({
+    Name = "Big Head (Target)",
+    Callback = function()
+        local plr = getSelectedPlayer()
+        if plr then setTargetScale(plr, 8, true) end
+    end
+})
+
+TrollTab:AddButton({
+    Name = "Make Target GIANT",
+    Callback = function()
+        local plr = getSelectedPlayer()
+        if plr then setTargetScale(plr, 5, false) end
+    end
+})
+
+TrollTab:AddButton({
+    Name = "Reset Target Size",
+    Callback = function()
+        local plr = getSelectedPlayer()
+        if plr then setTargetScale(plr, 1, false) end
+    end
+})
+
+-- =========================================================
+--  FLING LOOP
+-- =========================================================
+local flingLoopRunning = false
+
+TrollTab:AddToggle({
+    Name = "Fling Loop (Target)",
+    Default = false,
+    Callback = function(Value)
+        if Value and not flingLoopRunning then
+            flingLoopRunning = true
+            task.spawn(function()
+                while flingLoopRunning do
+                    local plr = getSelectedPlayer()
+                    if plr then flingPlayer(plr) end
+                    task.wait(0.6)
+                end
+            end)
+        elseif not Value then
+            flingLoopRunning = false
+        end
+    end
+})
+
+-- =========================================================
+--  INIT
+-- =========================================================
+Obsidian:Init()
