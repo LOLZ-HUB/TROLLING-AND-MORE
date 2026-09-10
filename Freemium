@@ -1,51 +1,87 @@
 --[[
-    LOLZ HUB TROLL
-    GUI: Obsidian (deividcomsono)
-    Theme: Pink
-    Features: Fly, Fling, Underground, Big Head, Infinite Jump, Body Scale
-    Use responsibly. Do not grief public servers you don't own.
+    LOLZ HUB TROLL — v3.0 💗
+    Fixed: Fly (PlatformStand + Physics state) & Fling (unanchor + max torque)
+    GUI: Obsidian by deividcomsono
 ]]
 
+-- === Library fetch with jsDelivr fallback ===
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+local function fetch(url)
+    local ok, res = pcall(game.HttpGet, game, url)
+    if ok and type(res) == "string" and #res > 500 then return res end
+    local mirror = url:gsub("raw%.githubusercontent%.com/deividcomsono/Obsidian/main/",
+        "cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/")
+    local ok2, res2 = pcall(game.HttpGet, game, mirror)
+    if ok2 and type(res2) == "string" and #res2 > 500 then return res2 end
+    error("[LOLZ HUB] Failed to download: " .. url)
+end
+
+local Library      = loadstring(fetch(repo .. "Library.lua"))()
+local SaveManager  = loadstring(fetch(repo .. "addons/SaveManager.lua"))()
 
 local Options = Library.Options
 local Toggles = Library.Toggles
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer      = Players.LocalPlayer
 
--- === Pink Theme Override ===
-pcall(function()
-    Library.Scheme.Accent    = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Button    = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Toggle    = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Slider    = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Dropdown  = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Tab       = Color3.fromRGB(255, 105, 180)
-    Library.Scheme.Outline   = Color3.fromRGB(255, 105, 180)
-end)
+-- ============================================================
+--  💗 FORCED PINK THEME
+-- ============================================================
+local function applyPinkTheme()
+    local S = Library.Scheme
+    if not S then return end
+    local PINK       = Color3.fromRGB(255, 105, 180)
+    local PINK_LIGHT = Color3.fromRGB(255, 182, 213)
+    local PINK_DARK  = Color3.fromRGB(180,  60, 130)
+    local BG_DARK    = Color3.fromRGB( 30,  15,  25)
+    local BG_MID     = Color3.fromRGB( 45,  20,  35)
+
+    S.Main           = BG_DARK
+    S.Background     = BG_MID
+    S.Outline        = PINK_DARK
+    S.FontColor      = PINK_LIGHT
+    S.Popup          = BG_MID
+    S.Button         = PINK
+    S.ButtonBorder   = PINK_DARK
+    S.Accent         = PINK
+    S.Toggle         = PINK
+    S.ToggleBorder   = PINK_DARK
+    S.Slider         = PINK
+    S.SliderBorder   = PINK_DARK
+    S.Dropdown       = BG_MID
+    S.DropdownBorder = PINK_DARK
+    S.Tab            = BG_DARK
+    S.TabBorder      = PINK_DARK
+    S.Textbox        = BG_DARK
+    S.Placeholder    = Color3.fromRGB(200, 140, 175)
+    S.Red            = Color3.fromRGB(255,  80, 110)
+    S.Green          = Color3.fromRGB(120, 230, 150)
+
+    if Library.UpdateColors  then pcall(Library.UpdateColors)  end
+    if Library.RefreshColors then pcall(Library.RefreshColors) end
+end
+applyPinkTheme()
 
 -- === Window ===
 local Window = Library:CreateWindow({
     Title = "LOLZ HUB TROLL",
-    Footer = "Pink Edition | v1.0",
+    Footer = "💗 Pink Edition | v1.1",
     Icon = 4483345998,
     NotifySide = "Right",
     ShowCustomCursor = true,
     AutoShow = true,
     Center = true,
 })
+applyPinkTheme()
 
 -- === Tabs ===
 local Tabs = {
-    Local     = Window:AddTab("Local Player", "user"),
-    Troll     = Window:AddTab("Troll Others", "zap"),
-    Settings  = Window:AddTab("UI Settings", "settings"),
+    Local    = Window:AddTab("Local Player", "user"),
+    Troll    = Window:AddTab("Troll Others", "zap"),
+    Settings = Window:AddTab("UI Settings", "settings"),
 }
 
 -- ==========================================================
@@ -59,11 +95,7 @@ local MoveGroup = Tabs.Local:AddGroupbox({
 
 MoveGroup:AddSlider("WalkSpeedSlider", {
     Text = "Walk Speed",
-    Default = 16,
-    Min = 16,
-    Max = 250,
-    Rounding = 0,
-    Suffix = " studs",
+    Default = 16, Min = 16, Max = 250, Rounding = 0, Suffix = " studs",
     Callback = function(Value)
         local char = LocalPlayer.Character
         if char and char:FindFirstChildOfClass("Humanoid") then
@@ -74,16 +106,13 @@ MoveGroup:AddSlider("WalkSpeedSlider", {
 
 MoveGroup:AddSlider("JumpPowerSlider", {
     Text = "Jump Power",
-    Default = 50,
-    Min = 50,
-    Max = 500,
-    Rounding = 0,
-    Suffix = " power",
+    Default = 50, Min = 50, Max = 500, Rounding = 0, Suffix = " power",
     Callback = function(Value)
         local char = LocalPlayer.Character
         if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").JumpPower = Value
-            char:FindFirstChildOfClass("Humanoid").UseJumpPower = true
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            hum.UseJumpPower = true
+            hum.JumpPower = Value
         end
     end,
 })
@@ -100,20 +129,34 @@ UserInputService.JumpRequest:Connect(function()
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
         end
     end
 end)
 
--- === Fly ===
-local flyBodyVelocity, flyBodyGyro, flyConn
+-- ==========================================================
+--  FLY — FIXED
+--  Key insight: Humanoid fights BodyMovers. Set PlatformStand
+--  + Physics state so the Humanoid stops controlling the rig.
+-- ==========================================================
+local flyBV, flyBG, flyConn
+local flyOldState = nil
 
 local function stopFly()
-    if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
-    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+    if flyBV then flyBV:Destroy() flyBV = nil end
+    if flyBG then flyBG:Destroy() flyBG = nil end
     if flyConn then flyConn:Disconnect() flyConn = nil end
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+            if flyOldState then
+                pcall(function() hum:ChangeState(flyOldState) end)
+                flyOldState = nil
+            end
+        end
+    end
 end
 
 local function startFly()
@@ -125,68 +168,77 @@ local function startFly()
 
     stopFly()
 
-    flyBodyVelocity = Instance.new("BodyVelocity")
-    flyBodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    flyBodyVelocity.Velocity = Vector3.zero
-    flyBodyVelocity.Parent = hrp
+    -- Save & override humanoid state so it stops fighting
+    flyOldState = hum:GetState()
+    pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+    hum.PlatformStand = true
 
-    flyBodyGyro = Instance.new("BodyGyro")
-    flyBodyGyro.P = 9e4
-    flyBodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    flyBodyGyro.CFrame = hrp.CFrame
-    flyBodyGyro.Parent = hrp
+    -- Body movers
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.Name = "LolzFlyBV"
+    flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    flyBV.Velocity = Vector3.new(0, 0, 0)
+    flyBV.P = 1250
+    flyBV.Parent = hrp
 
-    flyConn = RunService.Heartbeat:Connect(function()
+    flyBG = Instance.new("BodyGyro")
+    flyBG.Name = "LolzFlyBG"
+    flyBG.P = 9e4
+    flyBG.D = 500
+    flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    flyBG.CFrame = hrp.CFrame
+    flyBG.Parent = hrp
+
+    -- Use RenderStepped for smoother input sampling
+    flyConn = RunService.RenderStepped:Connect(function()
         if not Toggles.FlyToggle or not Toggles.FlyToggle.Value then return end
         local c = LocalPlayer.Character
         if not c then return end
         local root = c:FindFirstChild("HumanoidRootPart")
-        if not root or not flyBodyVelocity or not flyBodyGyro then return end
+        if not root or not flyBV or not flyBG then return end
 
         local speed = Options.FlySpeed and Options.FlySpeed.Value or 60
         local cam = workspace.CurrentCamera
-        local dir = Vector3.zero
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0, 1, 0) end
+        local dir = Vector3.new(0, 0, 0)
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W)        then dir = dir + cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S)        then dir = dir - cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A)        then dir = dir - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D)        then dir = dir + cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)    then dir = dir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)then dir = dir - Vector3.new(0, 1, 0) end
+
         if dir.Magnitude > 0 then dir = dir.Unit end
 
-        flyBodyVelocity.Velocity = dir * speed
-        flyBodyGyro.CFrame = cam.CFrame
+        flyBV.Velocity = dir * speed
+        flyBG.CFrame   = cam.CFrame
     end)
 end
 
 MoveGroup:AddToggle("FlyToggle", {
     Text = "Fly",
     Default = false,
-    Tooltip = "WASD to move, Space to go up, Shift to go down.",
-    Callback = function(v)
-        if v then startFly() else stopFly() end
-    end,
+    Tooltip = "WASD to move, Space = up, LeftShift = down.",
+    Callback = function(v) if v then startFly() else stopFly() end end,
 })
 
 MoveGroup:AddSlider("FlySpeed", {
     Text = "Fly Speed",
-    Default = 60,
-    Min = 10,
-    Max = 500,
-    Rounding = 0,
-    Suffix = " studs/s",
+    Default = 60, Min = 10, Max = 500, Rounding = 0, Suffix = " studs/s",
     Callback = function(v) end,
 })
 
--- Cleanup on death
+-- Re-fly after respawn
 LocalPlayer.CharacterAdded:Connect(function()
     if Toggles.FlyToggle and Toggles.FlyToggle.Value then
-        task.wait(1)
+        task.wait(0.8)
         startFly()
     end
 end)
 
--- === Size Group ===
+-- ==========================================================
+--  SIZE MODS
+-- ==========================================================
 local SizeGroup = Tabs.Local:AddGroupbox({
     Side = "Right",
     Name = "Size Mods",
@@ -202,11 +254,7 @@ SizeGroup:AddToggle("BigHead", {
 
 SizeGroup:AddSlider("BodyScale", {
     Text = "Body Scale",
-    Default = 1,
-    Min = 0.3,
-    Max = 5,
-    Rounding = 1,
-    Suffix = "x",
+    Default = 1, Min = 0.3, Max = 5, Rounding = 1, Suffix = "x",
     Callback = function(Value)
         local char = LocalPlayer.Character
         if not char then return end
@@ -221,7 +269,6 @@ SizeGroup:AddSlider("BodyScale", {
     end,
 })
 
--- Big head loop (client-side, works on R6 and R15)
 task.spawn(function()
     while task.wait(0.25) do
         if Toggles.BigHead and Toggles.BigHead.Value then
@@ -277,31 +324,76 @@ local function getTarget()
     return nil
 end
 
--- === FLING ===
+-- ==========================================================
+--  FLING — FIXED
+--  The trick: kill the Humanoid's state machine so it can't
+--  resist. Unanchor + apply max torque spin + burst velocity.
+-- ==========================================================
 local function flingCharacter(char)
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
 
-    -- Chaos fling: spin + velocity burst
-    local spin = Instance.new("BodyAngularVelocity")
-    spin.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    spin.AngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
-    spin.Parent = hrp
+    -- 1. Override the Humanoid state so it can't auto-correct
+    pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+    hum.PlatformStand = true
+    hum.AutoRotate = false
+    hum.Sit = false
 
+    -- 2. Unanchor every basepart so physics takes full control
+    local unanchored = {}
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            unanchored[part] = part.Anchored
+            part.Anchored = false
+        end
+    end
+
+    -- 3. Apply insane spin
+    local bav = Instance.new("BodyAngularVelocity")
+    bav.Name = "LolzFlingSpin"
+    bav.AngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
+    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bav.P = 1e6
+    bav.Parent = hrp
+
+    -- 4. Apply burst velocity in a random direction
     local bv = Instance.new("BodyVelocity")
+    bv.Name = "LolzFlingVel"
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Velocity = Vector3.new(
-        math.random(-500, 500),
-        math.random(500, 2000),
-        math.random(-500, 500)
+        math.random(-800, 800),
+        math.random(800, 2500),
+        math.random(-800, 800)
     )
+    bv.P = 1e5
     bv.Parent = hrp
 
-    task.delay(0.4, function()
-        if spin and spin.Parent then spin:Destroy() end
-        if bv and bv.Parent then bv:Destroy() end
+    -- 5. Also spam the raw velocity for good measure
+    hrp.AssemblyLinearVelocity = Vector3.new(
+        math.random(-500, 500),
+        math.random(1000, 2000),
+        math.random(-500, 500)
+    )
+    hrp.AssemblyAngularVelocity = Vector3.new(
+        math.random(-100, 100),
+        math.random(-100, 100),
+        math.random(-100, 100)
+    )
+
+    -- 6. Cleanup after 1 second
+    task.delay(1, function()
+        if bav and bav.Parent then bav:Destroy() end
+        if bv  and bv.Parent  then bv:Destroy()  end
+        if hum and hum.Parent then
+            hum.PlatformStand = false
+            hum.AutoRotate = true
+            pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+        end
+        for part, wasAnchored in pairs(unanchored) do
+            if part and part.Parent then part.Anchored = wasAnchored end
+        end
     end)
 end
 
@@ -311,11 +403,7 @@ TargetGroup:AddButton({
         local target = getTarget()
         if target and target.Character then
             flingCharacter(target.Character)
-            Library:Notify({
-                Title = "Fling",
-                Description = "Launched " .. target.Name .. " into orbit!",
-                Time = 3,
-            })
+            Library:Notify({ Title = "Fling", Description = "Launched " .. target.Name .. "!", Time = 3 })
         else
             Library:Notify({ Title = "Fling", Description = "No target selected.", Time = 3 })
         end
@@ -323,18 +411,17 @@ TargetGroup:AddButton({
     Tooltip = "Sends the target flying wildly.",
 })
 
+-- === Fling All (continuous) ===
 local flingAllActive = false
 TargetGroup:AddToggle("FlingAll", {
     Text = "🌀 Fling All (Loop)",
     Default = false,
     Tooltip = "Flings every other player continuously.",
-    Callback = function(v)
-        flingAllActive = v
-    end,
+    Callback = function(v) flingAllActive = v end,
 })
 
 task.spawn(function()
-    while task.wait(0.35) do
+    while task.wait(0.15) do
         if flingAllActive then
             for _, plr in ipairs(Players:GetPlayers()) do
                 if plr ~= LocalPlayer and plr.Character then
@@ -345,7 +432,6 @@ task.spawn(function()
     end
 end)
 
--- === UNDERGROUND ===
 TargetGroup:AddButton({
     Text = "⬇️ Send Underground",
     Func = function()
@@ -354,11 +440,7 @@ TargetGroup:AddButton({
             local hrp = target.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 hrp.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 500, 0))
-                Library:Notify({
-                    Title = "Underground",
-                    Description = target.Name .. " has been buried alive.",
-                    Time = 3,
-                })
+                Library:Notify({ Title = "Underground", Description = target.Name .. " has been buried.", Time = 3 })
             end
         else
             Library:Notify({ Title = "Underground", Description = "No target selected.", Time = 3 })
@@ -367,7 +449,7 @@ TargetGroup:AddButton({
     Tooltip = "Teleports target far below the map.",
 })
 
--- === HEAD MODS ON TARGET ===
+-- === Head Mods ===
 local HeadGroup = Tabs.Troll:AddGroupbox({
     Side = "Right",
     Name = "Head Mods",
@@ -391,23 +473,11 @@ local function setTargetHeadScale(scale)
     mesh.Scale = Vector3.new(scale, scale, scale)
 end
 
-HeadGroup:AddButton({
-    Text = "🤯 Huge Head Target",
-    Func = function() setTargetHeadScale(5) end,
-    Tooltip = "Bloats the target's head.",
-})
-HeadGroup:AddButton({
-    Text = "🐜 Tiny Head Target",
-    Func = function() setTargetHeadScale(0.3) end,
-    Tooltip = "Shrinks the target's head.",
-})
-HeadGroup:AddButton({
-    Text = "↩️ Reset Target Head",
-    Func = function() setTargetHeadScale(1) end,
-    Tooltip = "Restores the target's head.",
-})
+HeadGroup:AddButton({ Text = "🤯 Huge Head Target", Func = function() setTargetHeadScale(5)   end })
+HeadGroup:AddButton({ Text = "🐜 Tiny Head Target",  Func = function() setTargetHeadScale(0.3) end })
+HeadGroup:AddButton({ Text = "↩️ Reset Target Head", Func = function() setTargetHeadScale(1)   end })
 
--- === EXPLODE ===
+-- === Chaos ===
 local ChaosGroup = Tabs.Troll:AddGroupbox({
     Side = "Right",
     Name = "Chaos",
@@ -425,7 +495,6 @@ ChaosGroup:AddButton({
         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        -- Visual fire + ragdoll
         local fire = Instance.new("Fire")
         fire.Size = 15
         fire.Heat = 20
@@ -433,17 +502,20 @@ ChaosGroup:AddButton({
         task.delay(2, function() if fire then fire:Destroy() end end)
 
         local hum = target.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.PlatformStand = true end
-        hrp.Velocity = Vector3.new(0, 500, 0)
+        if hum then
+            hum.PlatformStand = true
+            pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+        end
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 800, 0)
+
         task.delay(2, function()
-            if hum and hum.Parent then hum.PlatformStand = false end
+            if hum and hum.Parent then
+                hum.PlatformStand = false
+                pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+            end
         end)
 
-        Library:Notify({
-            Title = "Explode",
-            Description = target.Name .. " went boom.",
-            Time = 3,
-        })
+        Library:Notify({ Title = "Explode", Description = target.Name .. " went boom.", Time = 3 })
     end,
     Tooltip = "Ragdolls and launches the target with fire.",
 })
@@ -473,55 +545,53 @@ MenuGroup:AddToggle("AlwaysOnTop", {
     Callback = function(v) Window:SetAlwaysOnTop(v) end,
 })
 MenuGroup:AddDropdown("NotificationSide", {
-    Values = { "Left", "Right" },
-    Default = "Right",
-    Text = "Notification Side",
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
     Callback = function(v) Library:SetNotifySide(v) end,
 })
 MenuGroup:AddDropdown("DPIDropdown", {
     Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
-    Default = "100%",
-    Text = "DPI Scale",
+    Default = "100%", Text = "DPI Scale",
     Callback = function(v)
         v = v:gsub("%%", "")
         Library:SetDPIScale(tonumber(v))
     end,
 })
 MenuGroup:AddSlider("UICornerSlider", {
-    Text = "Corner Radius",
-    Default = Library.CornerRadius,
-    Min = 0,
-    Max = 20,
-    Rounding = 0,
+    Text = "Corner Radius", Default = Library.CornerRadius,
+    Min = 0, Max = 20, Rounding = 0,
     Callback = function(v) Window:SetCornerRadius(v) end,
+})
+MenuGroup:AddButton({
+    Text = "💗 Re-Apply Pink Theme",
+    Func = function()
+        applyPinkTheme()
+        Library:Notify({ Title = "Theme", Description = "Pink theme re-applied.", Time = 3 })
+    end,
 })
 MenuGroup:AddDivider()
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-    Default = "RightShift",
-    NoUI = true,
-    Text = "Menu keybind",
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
 })
 MenuGroup:AddButton({
     Text = "Unload",
-    Func = function() Library:Unload() end,
+    Func = function()
+        stopFly()
+        Library:Unload()
+    end,
 })
 
 Library.ToggleKeybind = Options.MenuKeybind
 
--- === Addons ===
-ThemeManager:SetLibrary(Library)
+-- === SaveManager ===
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-ThemeManager:SetFolder("LolzHubTroll")
 SaveManager:SetFolder("LolzHubTroll/configs")
 SaveManager:BuildConfigSection(Tabs.Settings)
-ThemeManager:ApplyToTab(Tabs.Settings)
 SaveManager:LoadAutoloadConfig()
 
--- === Welcome Notification ===
 Library:Notify({
-    Title = "LOLZ HUB TROLL",
-    Description = "Loaded successfully. Go cause chaos.",
+    Title = "LOLZ HUB TROLL 💗",
+    Description = "v3 — Fly & Fling fixed.",
     Time = 5,
 })
