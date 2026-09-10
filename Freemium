@@ -1,7 +1,7 @@
 --[[
-    LOLZ HUB TROLL — v5.0
+    LOLZ HUB TROLL — v1.2 (FE Fixed)
     GUI: Obsidian by deividcomsono (default theme)
-    Features: Fly, Fling, Big Head (R6+R15), Body Scale, Underground, Explode
+    Features: Fly, FE Fling, Big Head (R6+R15), Body Scale, Underground, Explode
 ]]
 
 -- ============================================================
@@ -36,11 +36,11 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer      = Players.LocalPlayer
 
 -- ============================================================
---  WINDOW (default Obsidian theme)
+--  WINDOW
 -- ============================================================
 local Window = Library:CreateWindow({
     Title = "LOLZ HUB TROLL",
-    Footer = "v1.1",
+    Footer = "v1.2 (FE Fixed)",
     Icon = 4483345998,
     NotifySide = "Right",
     ShowCustomCursor = true,
@@ -204,10 +204,9 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================
---  SIZE MODS — R6 + R15 COMPATIBLE
+--  SIZE MODS (Local Only)
 -- ============================================================
 
--- Detect rig type
 local function getRigType(char)
     if not char then return "Unknown" end
     if char:FindFirstChild("Humanoid") and char:FindFirstChild("UpperTorso") then
@@ -218,7 +217,6 @@ local function getRigType(char)
     return "Unknown"
 end
 
--- Core big-head function: applies scale to whatever head type exists
 local function applyHeadScale(char, scale)
     if not char then return end
     local head = char:FindFirstChild("Head")
@@ -227,21 +225,10 @@ local function applyHeadScale(char, scale)
     local hum = char:FindFirstChildOfClass("Humanoid")
 
     if rig == "R15" then
-        -- R15: head is a MeshPart. Use Humanoid.HeadScale (native scaling).
         if hum then
             pcall(function() hum.HeadScale = scale end)
         end
-        -- Also attempt MeshPart size as fallback for some rigs
-        if head:IsA("MeshPart") then
-            local baseSize = head:GetAttribute("LolzBaseSize")
-            if not baseSize then
-                head:SetAttribute("LolzBaseSize", head.Size.Magnitude)
-                baseSize = head.Size.Magnitude
-            end
-            -- MeshPart size is capped by Roblox; HeadScale is more reliable
-        end
     else
-        -- R6 (or generic): head is a Part with a SpecialMesh
         local mesh = head:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
             mesh = Instance.new("SpecialMesh")
@@ -264,7 +251,6 @@ SizeGroup:AddToggle("BigHead", {
     Tooltip = "Works on both R6 and R15 rigs.",
     Callback = function(v)
         if not v then
-            -- restore when toggled off
             local char = LocalPlayer.Character
             if char then
                 local head = char:FindFirstChild("Head")
@@ -283,14 +269,12 @@ SizeGroup:AddSlider("BigHeadScale", {
     Text = "Big Head Size",
     Default = 3, Min = 0.5, Max = 10, Rounding = 1, Suffix = "x",
     Callback = function(Value)
-        -- if toggle is on, apply live
         if Toggles.BigHead and Toggles.BigHead.Value then
             applyHeadScale(LocalPlayer.Character, Value)
         end
     end,
 })
 
--- Big head loop (re-applies in case character parts respawn)
 task.spawn(function()
     while task.wait(0.2) do
         if Toggles.BigHead and Toggles.BigHead.Value then
@@ -300,9 +284,8 @@ task.spawn(function()
     end
 end)
 
--- Body scale (R15 native, R6 via mesh)
 SizeGroup:AddSlider("BodyScale", {
-    Text = "Body Scale",
+    Text = "Body Scale (R15)",
     Default = 1, Min = 0.3, Max = 5, Rounding = 1, Suffix = "x",
     Callback = function(Value)
         local char = LocalPlayer.Character
@@ -313,7 +296,6 @@ SizeGroup:AddSlider("BodyScale", {
             hum.BodyHeightScale = Value
             hum.BodyWidthScale  = Value
             hum.BodyDepthScale  = Value
-            -- Note: this only works on R15. For R6, you'd need mesh edits.
         end)
     end,
 })
@@ -342,7 +324,6 @@ local function getTarget()
             local p = Players:FindFirstChild(tostring(k))
             if p then return p end
         end
-        return nil
     end
     if type(val) == "string" and val ~= "" then
         return Players:FindFirstChild(val)
@@ -350,115 +331,87 @@ local function getTarget()
     return nil
 end
 
--- === FLING ===
-local function flingCharacter(char)
-    if not char then return end
+-- === FE FLING (Fixed to work globally) ===
+local function feFlingCharacter(targetChar)
+    local char = LocalPlayer.Character
+    if not char or not targetChar then return end
+    
     local hrp = char:FindFirstChild("HumanoidRootPart")
+    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
+    
+    if not hrp or not targetHrp or not hum then return end
 
-    pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+    -- Save original position to return after fling
+    local oldPos = hrp.CFrame
+    local oldStand = hum.PlatformStand
+    
     hum.PlatformStand = true
-    hum.AutoRotate = false
-
-    local unanchored = {}
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            unanchored[part] = part.Anchored
-            part.Anchored = false
-        end
-    end
-
+    
+    -- Apply massive rotation to LocalPlayer
     local bav = Instance.new("BodyAngularVelocity")
-    bav.Name = "LolzFlingSpin"
-    bav.AngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
+    bav.Name = "FEFlingSpin"
+    bav.AngularVelocity = Vector3.new(99999, 99999, 99999)
     bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bav.P = 1e6
     bav.Parent = hrp
 
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "LolzFlingVel"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(
-        math.random(-800, 800),
-        math.random(800, 2500),
-        math.random(-800, 800)
-    )
-    bv.P = 1e5
-    bv.Parent = hrp
-
-    hrp.AssemblyLinearVelocity  = Vector3.new(math.random(-500, 500), math.random(1000, 2000), math.random(-500, 500))
-    hrp.AssemblyAngularVelocity = Vector3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
-
-    task.delay(1, function()
-        if bav and bav.Parent then bav:Destroy() end
-        if bv  and bv.Parent  then bv:Destroy()  end
-        if hum and hum.Parent then
-            hum.PlatformStand = false
-            hum.AutoRotate = true
-            pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+    local startTime = tick()
+    local flingLoop
+    
+    -- Teleport repeatedly into the target to ensure physical collision
+    flingLoop = RunService.Stepped:Connect(function()
+        if tick() - startTime > 1.5 or not targetHrp or not hrp then
+            if flingLoop then flingLoop:Disconnect() end
+            return
         end
-        for part, wasAnchored in pairs(unanchored) do
-            if part and part.Parent then part.Anchored = wasAnchored end
-        end
+        hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 0)
+    end)
+
+    -- Cleanup and return to original spot
+    task.delay(1.6, function()
+        if flingLoop then flingLoop:Disconnect() end
+        if bav then bav:Destroy() end
+        hum.PlatformStand = oldStand
+        hrp.CFrame = oldPos
+        hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
     end)
 end
 
 TargetGroup:AddButton({
-    Text = "🌀 Fling Target",
+    Text = "🌀 Fling Target (FE Working)",
     Func = function()
         local target = getTarget()
         if target and target.Character then
-            flingCharacter(target.Character)
-            Library:Notify({ Title = "Fling", Description = "Launched " .. target.Name .. "!", Time = 3 })
+            feFlingCharacter(target.Character)
+            Library:Notify({ Title = "Flinging", Description = "Rammed into " .. target.Name .. "!", Time = 3 })
         else
-            Library:Notify({ Title = "Fling", Description = "No target selected.", Time = 3 })
+            Library:Notify({ Title = "Error", Description = "No target selected.", Time = 3 })
         end
     end,
-    Tooltip = "Sends the target flying wildly.",
+    Tooltip = "Uses your character as a physics projectile to fling them.",
 })
-
-local flingAllActive = false
-TargetGroup:AddToggle("FlingAll", {
-    Text = "🌀 Fling All (Loop)",
-    Default = false,
-    Tooltip = "Flings every other player continuously.",
-    Callback = function(v) flingAllActive = v end,
-})
-
-task.spawn(function()
-    while task.wait(0.15) do
-        if flingAllActive then
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character then
-                    flingCharacter(plr.Character)
-                end
-            end
-        end
-    end
-end)
 
 TargetGroup:AddButton({
-    Text = "⬇️ Send Underground",
+    Text = "⬇️ Send Underground (Client-Sided)",
     Func = function()
         local target = getTarget()
         if target and target.Character then
             local hrp = target.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 hrp.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 500, 0))
-                Library:Notify({ Title = "Underground", Description = target.Name .. " has been buried.", Time = 3 })
+                Library:Notify({ Title = "Underground", Description = "Moved " .. target.Name .. " locally.", Time = 3 })
             end
-        else
-            Library:Notify({ Title = "Underground", Description = "No target selected.", Time = 3 })
         end
     end,
-    Tooltip = "Teleports target far below the map.",
+    Tooltip = "Only you will see them go underground due to FilteringEnabled.",
 })
 
 -- === HEAD MODS ON TARGET ===
 local HeadGroup = Tabs.Troll:AddGroupbox({
     Side = "Right",
-    Name = "Head Mods",
+    Name = "Head Mods (Client-Sided)",
     IconName = "smile",
 })
 
@@ -469,6 +422,7 @@ local function setTargetHeadScale(scale)
         return
     end
     applyHeadScale(target.Character, scale)
+    Library:Notify({ Title = "Head Mod", Description = "Applied locally.", Time = 2 })
 end
 
 HeadGroup:AddButton({ Text = "🤯 Huge Head Target",  Func = function() setTargetHeadScale(5)   end })
@@ -478,7 +432,7 @@ HeadGroup:AddButton({ Text = "↩️ Reset Target Head",  Func = function() setT
 -- === Chaos ===
 local ChaosGroup = Tabs.Troll:AddGroupbox({
     Side = "Right",
-    Name = "Chaos",
+    Name = "Chaos (Client-Sided)",
     IconName = "flame",
 })
 
@@ -486,10 +440,7 @@ ChaosGroup:AddButton({
     Text = "💥 Explode Target",
     Func = function()
         local target = getTarget()
-        if not target or not target.Character then
-            Library:Notify({ Title = "Explode", Description = "No target.", Time = 2 })
-            return
-        end
+        if not target or not target.Character then return end
         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
@@ -513,9 +464,9 @@ ChaosGroup:AddButton({
             end
         end)
 
-        Library:Notify({ Title = "Explode", Description = target.Name .. " went boom.", Time = 3 })
+        Library:Notify({ Title = "Explode", Description = "Exploded locally.", Time = 3 })
     end,
-    Tooltip = "Ragdolls and launches the target with fire.",
+    Tooltip = "Only visible on your screen.",
 })
 
 -- ============================================================
@@ -584,7 +535,7 @@ MenuGroup:AddButton({
 Library.ToggleKeybind = Options.MenuKeybind
 
 -- ============================================================
---  SAVE MANAGER (optional)
+--  SAVE MANAGER
 -- ============================================================
 pcall(function()
     SaveManager:SetLibrary(Library)
@@ -597,6 +548,6 @@ end)
 
 Library:Notify({
     Title = "LOLZ HUB TROLL",
-    Description = "v1.1 loaded — default theme, all features working.",
+    Description = "v1.2 loaded — Fling fixed to bypass FE.",
     Time = 5,
 })
