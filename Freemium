@@ -1,11 +1,11 @@
 --[[
-    LOLZ HUB TROLL — v4.0 💗
-    GUI: Obsidian by deividcomsono
-    Load: uses plain game:HttpGet (same as the working example)
+    LOLZ HUB TROLL — v5.0
+    GUI: Obsidian by deividcomsono (default theme)
+    Features: Fly, Fling, Big Head (R6+R15), Body Scale, Underground, Explode
 ]]
 
 -- ============================================================
---  LIBRARY LOADER — simple, like the working example
+--  LIBRARY LOADER
 -- ============================================================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 
@@ -14,7 +14,6 @@ local function loadRemote(url)
     if ok and type(res) == "string" and #res > 500 then
         return res
     end
-    -- Fallback to syn/request-based executors
     local req = (syn and syn.request) or (http and http.request) or http_request or request
     if req then
         local ok2, res2 = pcall(req, { Url = url, Method = "GET" })
@@ -37,55 +36,17 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer      = Players.LocalPlayer
 
 -- ============================================================
---  💗 PINK THEME (wrapped in pcall so a missing key can't crash)
--- ============================================================
-local function applyPinkTheme()
-    pcall(function()
-        local S = Library.Scheme
-        if not S then return end
-        local PINK       = Color3.fromRGB(255, 105, 180)
-        local PINK_LIGHT = Color3.fromRGB(255, 182, 213)
-        local PINK_DARK  = Color3.fromRGB(180,  60, 130)
-        local BG_DARK    = Color3.fromRGB( 30,  15,  25)
-        local BG_MID     = Color3.fromRGB( 45,  20,  35)
-
-        S.Main           = BG_DARK
-        S.Background     = BG_MID
-        S.Outline        = PINK_DARK
-        S.FontColor      = PINK_LIGHT
-        S.Popup          = BG_MID
-        S.Button         = PINK
-        S.ButtonBorder   = PINK_DARK
-        S.Accent         = PINK
-        S.Toggle         = PINK
-        S.ToggleBorder   = PINK_DARK
-        S.Slider         = PINK
-        S.SliderBorder   = PINK_DARK
-        S.Dropdown       = BG_MID
-        S.DropdownBorder = PINK_DARK
-        S.Tab            = BG_DARK
-        S.TabBorder      = PINK_DARK
-        S.Textbox        = BG_DARK
-        S.Placeholder    = Color3.fromRGB(200, 140, 175)
-        S.Red            = Color3.fromRGB(255,  80, 110)
-        S.Green          = Color3.fromRGB(120, 230, 150)
-    end)
-end
-applyPinkTheme()
-
--- ============================================================
---  WINDOW
+--  WINDOW (default Obsidian theme)
 -- ============================================================
 local Window = Library:CreateWindow({
     Title = "LOLZ HUB TROLL",
-    Footer = "💗 Pink Edition | v4.0",
+    Footer = "v1.1",
     Icon = 4483345998,
     NotifySide = "Right",
     ShowCustomCursor = true,
     AutoShow = true,
     Center = true,
 })
-applyPinkTheme()
 
 -- ============================================================
 --  TABS
@@ -147,7 +108,7 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -- ============================================================
---  FLY (fixed)
+--  FLY
 -- ============================================================
 local flyBV, flyBG, flyConn
 local flyOldState = nil
@@ -243,8 +204,54 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================
---  SIZE MODS
+--  SIZE MODS — R6 + R15 COMPATIBLE
 -- ============================================================
+
+-- Detect rig type
+local function getRigType(char)
+    if not char then return "Unknown" end
+    if char:FindFirstChild("Humanoid") and char:FindFirstChild("UpperTorso") then
+        return "R15"
+    elseif char:FindFirstChild("Torso") then
+        return "R6"
+    end
+    return "Unknown"
+end
+
+-- Core big-head function: applies scale to whatever head type exists
+local function applyHeadScale(char, scale)
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    local rig = getRigType(char)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    if rig == "R15" then
+        -- R15: head is a MeshPart. Use Humanoid.HeadScale (native scaling).
+        if hum then
+            pcall(function() hum.HeadScale = scale end)
+        end
+        -- Also attempt MeshPart size as fallback for some rigs
+        if head:IsA("MeshPart") then
+            local baseSize = head:GetAttribute("LolzBaseSize")
+            if not baseSize then
+                head:SetAttribute("LolzBaseSize", head.Size.Magnitude)
+                baseSize = head.Size.Magnitude
+            end
+            -- MeshPart size is capped by Roblox; HeadScale is more reliable
+        end
+    else
+        -- R6 (or generic): head is a Part with a SpecialMesh
+        local mesh = head:FindFirstChildOfClass("SpecialMesh")
+        if not mesh then
+            mesh = Instance.new("SpecialMesh")
+            mesh.MeshType = Enum.MeshType.Head
+            mesh.Parent = head
+        end
+        mesh.Scale = Vector3.new(scale, scale, scale)
+    end
+end
+
 local SizeGroup = Tabs.Local:AddGroupbox({
     Side = "Right",
     Name = "Size Mods",
@@ -252,12 +259,48 @@ local SizeGroup = Tabs.Local:AddGroupbox({
 })
 
 SizeGroup:AddToggle("BigHead", {
-    Text = "Big Head (Client)",
+    Text = "Big Head",
     Default = false,
-    Tooltip = "Makes your head huge locally.",
-    Callback = function(v) end,
+    Tooltip = "Works on both R6 and R15 rigs.",
+    Callback = function(v)
+        if not v then
+            -- restore when toggled off
+            local char = LocalPlayer.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local mesh = head:FindFirstChildOfClass("SpecialMesh")
+                    if mesh then mesh.Scale = Vector3.new(1, 1, 1) end
+                end
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then pcall(function() hum.HeadScale = 1 end) end
+            end
+        end
+    end,
 })
 
+SizeGroup:AddSlider("BigHeadScale", {
+    Text = "Big Head Size",
+    Default = 3, Min = 0.5, Max = 10, Rounding = 1, Suffix = "x",
+    Callback = function(Value)
+        -- if toggle is on, apply live
+        if Toggles.BigHead and Toggles.BigHead.Value then
+            applyHeadScale(LocalPlayer.Character, Value)
+        end
+    end,
+})
+
+-- Big head loop (re-applies in case character parts respawn)
+task.spawn(function()
+    while task.wait(0.2) do
+        if Toggles.BigHead and Toggles.BigHead.Value then
+            local scale = Options.BigHeadScale and Options.BigHeadScale.Value or 3
+            applyHeadScale(LocalPlayer.Character, scale)
+        end
+    end
+end)
+
+-- Body scale (R15 native, R6 via mesh)
 SizeGroup:AddSlider("BodyScale", {
     Text = "Body Scale",
     Default = 1, Min = 0.3, Max = 5, Rounding = 1, Suffix = "x",
@@ -270,33 +313,10 @@ SizeGroup:AddSlider("BodyScale", {
             hum.BodyHeightScale = Value
             hum.BodyWidthScale  = Value
             hum.BodyDepthScale  = Value
-            hum.HeadScale       = Value
+            -- Note: this only works on R15. For R6, you'd need mesh edits.
         end)
     end,
 })
-
-task.spawn(function()
-    while task.wait(0.25) do
-        if Toggles.BigHead and Toggles.BigHead.Value then
-            local char = LocalPlayer.Character
-            if char then
-                local head = char:FindFirstChild("Head")
-                if head then
-                    local mesh = head:FindFirstChildOfClass("SpecialMesh")
-                    if mesh then
-                        mesh.Scale = Vector3.new(3, 3, 3)
-                    else
-                        for _, d in ipairs(head:GetDescendants()) do
-                            if d:IsA("SpecialMesh") or d:IsA("Mesh") then
-                                d.Scale = Vector3.new(3, 3, 3)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
 
 -- ============================================================
 --  TROLL OTHERS TAB
@@ -330,7 +350,7 @@ local function getTarget()
     return nil
 end
 
--- === FLING (fixed) ===
+-- === FLING ===
 local function flingCharacter(char)
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -435,7 +455,7 @@ TargetGroup:AddButton({
     Tooltip = "Teleports target far below the map.",
 })
 
--- === Head Mods ===
+-- === HEAD MODS ON TARGET ===
 local HeadGroup = Tabs.Troll:AddGroupbox({
     Side = "Right",
     Name = "Head Mods",
@@ -448,15 +468,7 @@ local function setTargetHeadScale(scale)
         Library:Notify({ Title = "Head Mod", Description = "No target.", Time = 2 })
         return
     end
-    local head = target.Character:FindFirstChild("Head")
-    if not head then return end
-    local mesh = head:FindFirstChildOfClass("SpecialMesh")
-    if not mesh then
-        mesh = Instance.new("SpecialMesh")
-        mesh.MeshType = Enum.MeshType.Head
-        mesh.Parent = head
-    end
-    mesh.Scale = Vector3.new(scale, scale, scale)
+    applyHeadScale(target.Character, scale)
 end
 
 HeadGroup:AddButton({ Text = "🤯 Huge Head Target",  Func = function() setTargetHeadScale(5)   end })
@@ -557,14 +569,6 @@ MenuGroup:AddSlider("UICornerSlider", {
     Callback = function(v) Window:SetCornerRadius(v) end,
 })
 
-MenuGroup:AddButton({
-    Text = "💗 Re-Apply Pink Theme",
-    Func = function()
-        applyPinkTheme()
-        Library:Notify({ Title = "Theme", Description = "Pink theme re-applied.", Time = 3 })
-    end,
-})
-
 MenuGroup:AddDivider()
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
     Default = "RightShift", NoUI = true, Text = "Menu keybind",
@@ -580,7 +584,7 @@ MenuGroup:AddButton({
 Library.ToggleKeybind = Options.MenuKeybind
 
 -- ============================================================
---  SAVE MANAGER (wrapped in pcall — optional)
+--  SAVE MANAGER (optional)
 -- ============================================================
 pcall(function()
     SaveManager:SetLibrary(Library)
@@ -592,7 +596,7 @@ pcall(function()
 end)
 
 Library:Notify({
-    Title = "LOLZ HUB TROLL 💗",
-    Description = "v4 — loaded successfully.",
+    Title = "LOLZ HUB TROLL",
+    Description = "v1.1 loaded — default theme, all features working.",
     Time = 5,
 })
